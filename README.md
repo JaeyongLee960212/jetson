@@ -129,7 +129,7 @@
    11. git add .
    12. git commit -m "새로운 내용 설명"
    13. git push
-   <When error occurs because of Large Files>
+   (When error occurs because of Large Files)
       1. nano .gitignore
          <Copy&Paste>
          data/**
