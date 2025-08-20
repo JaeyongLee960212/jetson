@@ -30,7 +30,7 @@ def main():
     model.fuse() # fusion conv2d and batchNorm2d 
 
     #dataset = LCD_LoadStreams(sources = "192.168.10.116", vid_stride = 1, buffer = True)
-    dataset = LoadImagesAndVideos("/data/YOLOv8_TL/Blink_test_1.mp4", vid_stride = 1)
+    dataset = LoadImagesAndVideos("/data/Integration Test.mp4", vid_stride = 1)
 
     # obj_track_dict ex) {0: {'cls':0, 'cls_name':r.names[int(cls)],'conf':0.9, 'xywh':[10,20,30,40]}, 2: {'cls':0, 'cls_name':r.names[int(cls)],'conf':0.9, 'xywh':[133,203,303,430]} }
     obj_track_dict = {}

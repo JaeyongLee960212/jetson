@@ -27,6 +27,7 @@ data/**
 # --- YOLOv8_* 폴더만 추적 허용 ---
 !data/YOLOv8_*/
 !data/YOLOv8_*/**
+!data/heartbeat
 
 # --- 하지만 YOLOv8_* 폴더 최상위의 대형 파일은 다시 무시 ---
 data/YOLOv8_*/*.mp4
@@ -38,4 +39,4 @@ data/YOLOv8_*/*.pt
 !data/YOLOv8_*/**/*.sh
 !data/YOLOv8_*/**/*.yaml
 !data/*.yml
-
+!data/heartbeat/*.py
