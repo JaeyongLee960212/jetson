@@ -81,7 +81,7 @@ def main():
                         continue
                     
                     #send once  
-                    if (send_once == True and id_cls not in sent_id_cls): #and check_valid()                  
+                    if (send_once == True and id_cls not in sent_id_cls and obj_track_dict[id_cls]['cls'] != 2): #and check_valid()                  
 
                         # gen detect time & img file name
                         detect_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")
