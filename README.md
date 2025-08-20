@@ -114,5 +114,41 @@
  └── 📄 docker-compose.yaml (Main File for Running Docker Compose)
 </pre>
 
+### Getting Started
+<pre>
+   1. git --version 
+   2. 사용하고자 하는 폴더 내로 들어가서 git init
+   3. git config --global -user.name 'JaeyongLee960212'
+   4. git config --global user.password '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' (토큰)
+   5. git config --global credential.helper store
+   6. git remote add origin https://github.com/JaeyongLee960212/jetson.git
+   7. git fetch
+   8. git branch -r
+   9. git checkout main or jetson
+   10. git pull
+   11. git add .
+   12. git commit -m "새로운 내용 설명"
+   13. git push
+   <When error occurs because of Large Files>
+      1. nano .gitignore
+         <Copy&Paste>
+         data/**
+         
+         !data/YOLOv8_*/
+         !data/YOLOv8_*/**
+         
+         data/YOLOv8_*/*.mp4
+         data/YOLOv8_*/*.avi
+         data/YOLOv8_*/*.pt
+         
+         !data/YOLOv8_*/**/*.py
+         !data/YOLOv8_*/**/*.sh
+         !data/YOLOv8_*/**/*.yaml
+         !data/*.yml
+      2. Ctrl+O and then Press Enter
+      3. Ctrl+X to get out
+      4. Finish
+</pre>
+
 ### History
 Last updated on 2025-08-13 13:22:00
