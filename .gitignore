@@ -37,4 +37,5 @@ data/YOLOv8_*/*.pt
 !data/YOLOv8_*/**/*.py
 !data/YOLOv8_*/**/*.sh
 !data/YOLOv8_*/**/*.yaml
+!data/*.yml
 
