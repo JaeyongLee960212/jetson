@@ -1,0 +1,40 @@
+__pycache__
+*.pyc
+*.tar.gz
+*.so
+*.deb
+*.symvers
+
+logs
+test/data
+runner
+venv
+*.minus-github-api
+.DS_Store
+.vscode
+.ninja_log
+.polyscope.ini
+.ipynb_checkpoints
+.idea
+nv_tegra_release
+kokoro-*-*.wav
+audio.wav
+benchmark.csv
+
+# --- 기본적으로 data 전체 무시 ---
+data/**
+
+# --- YOLOv8_* 폴더만 추적 허용 ---
+!data/YOLOv8_*/
+!data/YOLOv8_*/**
+
+# --- 하지만 YOLOv8_* 폴더 최상위의 대형 파일은 다시 무시 ---
+data/YOLOv8_*/*.mp4
+data/YOLOv8_*/*.avi
+data/YOLOv8_*/*.pt
+
+# (선택) YOLOv8_* 내부에서 코드/스크립트/설정만 허용
+!data/YOLOv8_*/**/*.py
+!data/YOLOv8_*/**/*.sh
+!data/YOLOv8_*/**/*.yaml
+

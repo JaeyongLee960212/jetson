@@ -1,0 +1,14 @@
+{
+	"type": "11",
+	"cls_name": "LCS_ROAD_USABLE_1",
+	"cls": 0,
+	"conf": 0.7253842949867249,
+	"x": 896.0286254882812,
+	"y": 27.46033477783203,
+	"w": 124.28759765625,
+	"h": 54.41358947753906,
+	"frame_count": 398,
+	"detect_img_path": "/front_cam/2025_06_18/LCS_ROAD_USABLE_1/090a060f03abe9fb0dd6.jpg",
+	"detect_status": "ON",
+	"detect_time": "2025-06-18 19:24:56:854024"
+}
