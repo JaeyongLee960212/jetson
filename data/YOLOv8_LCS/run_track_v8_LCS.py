@@ -15,8 +15,6 @@ from ultralytics import YOLO
 #from ultralytics.nn.modules.block import Bottleneck
 #pytorch > 2.6 이면 /opt/venv/lib/python3.12/site-packages/ultralytics/nn/tasks.py 가서 torch.load 수정해야댐 shiver
 
-
-
 import numpy as np
 import cv2
 import hashlib

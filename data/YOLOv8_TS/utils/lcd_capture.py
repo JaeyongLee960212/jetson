@@ -75,15 +75,13 @@ class Stream_Vision_Cam:
 
         self.devices = self.create_devices_with_tries()     # waits for the user to connect a device before raising
     
-        #find 2 camera   
+        #find 2 camera    
+        self.device = None
         for d in self.devices:
-            if (str(d).find(self.cam_ip) != -1):
-                self.device = d
-                print("device :",self.device)
-                break
-            else:
-                self.device = None
-        self.device = self.devices[0]
+            if cam_ip in str(d):
+                self.device = d; break
+        if self.device is None:
+            self.device = self.devices[0]
         
         print(f'{TAB1}Enable multicast')
         self.device.tl_stream_nodemap['StreamMulticastEnable'].value = True
@@ -144,7 +142,7 @@ class Stream_Vision_Cam:
         self.device.requeue_buffer(self.buffer)
         self.buffer_bytes_per_pixel = int(len(self.item.data)/(self.item.width * self.item.height))
         self.array = (ctypes.c_ubyte * self.num_channels * self.item.width * self.item.height).from_address(ctypes.addressof(self.item.pbytes)) # Buffer data as cpointers can be accessed using buffer.pbytes
-        self.npndarray = np.ndarray(buffer=self.array, dtype=np.uint8, shape=(self.item.height, self.item.width, self.buffer_bytes_per_pixel)) # Create a reshaped NumPy array to display using OpenCV
+        self.npndarray = np.ndarray(buffer=self.array, dtype=np.uint8, shape=(self.item.height, self.item.width, self.buffer_bytes_per_pixel)).copy() # Create a reshaped NumPy array to display using OpenCV #MODI use-after-free: 반환하는 NumPy가 이미 해제된 버퍼 가리키던 코드 수정 (지연·크래시·난수 오류 유발)
         self.fps = round(1/(self.curr_frame_time - self.prev_frame_time),6)
         self.fc += 1
         BufferFactory.destroy(self.item) # Destroy the copied item to prevent memory leaks

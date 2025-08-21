@@ -91,8 +91,14 @@ class LCD_LoadStreams:
                     # if cv2.waitKey(1) & 0xFF == ord("q"):
                     #     break
                     #####
-                    self.fps = cap.fps
-                    print("update fps : ",cap.fps)
+                    #Modi - FPS 리스트를 스칼라로 덮어쓰는 레이스 버그 -> time.sleep(1/self.fps) 
+                    # 갱신
+                    fps_val = cap.fps if (cap.fps and cap.fps > 0) else 30
+                    self.fps[i] = fps_val
+
+                    # 대기
+                    delay = 1.0 / max(1.0, self.fps[i])  # 하한 1 FPS
+                    time.sleep(min(delay, 0.033))         # 상한도 33ms 정도로 캡
 
                     if not success:
                         im = np.zeros(self.shape[i], dtype=np.uint8)
