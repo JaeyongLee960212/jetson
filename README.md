@@ -4,7 +4,7 @@
 1. **VMS**  
    : Based on YOLOv8s, Trained by 60 images, Class : 2 (VMS_ON, VMS_OFF)
 2. **LCS**  
-   : Based on YOLOv8s, Trained by 17,394 images, Class : 2 (LCS_ROAD_USUABLE, LCS_ROAD_UNUSUABLE, LCS_BROKEN)
+   : Based on YOLOv8s, Trained by 17,394 images, Class : 3 (LCS_ROAD_USUABLE, LCS_ROAD_UNUSUABLE, LCS_BROKEN)
 3. **Traffic Light**  
    : Based on YOLOv8s, Trained by 740,724 images, Class : 6 (TRAFFIC_LIGHT_GREEN etc...)
 4. **Traffic Sign**  
