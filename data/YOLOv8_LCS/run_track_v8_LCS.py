@@ -1,348 +1,269 @@
 from ultralytics import YOLO
 
-#if pytorch version is higher than 2.6 import this
-#import torch
-#from torch.nn.modules.container import Sequential, ModuleList
-#from torch.nn.modules.conv import Conv2d
-#from torch.nn.modules.batchnorm import BatchNorm2d
-#from torch.nn.modules.activation import SiLU
-#from torch.nn.modules.upsampling import Upsample
-
-#from ultralytics.nn.tasks import DetectionModel
-#from ultralytics.nn.modules.conv import Conv
-#from ultralytics.nn.modules.block import C2f, C3, SPPF
-#from ultralytics.nn.modules.head import Detect
-#from ultralytics.nn.modules.block import Bottleneck
-#pytorch > 2.6 이면 /opt/venv/lib/python3.12/site-packages/ultralytics/nn/tasks.py 가서 torch.load 수정해야댐 shiver
-
-
-
 import numpy as np
 import cv2
-import hashlib
+import os
+import uuid
+import time
 from datetime import datetime
+from collections import deque
+
 from utils.loader import LCD_LoadStreams, LoadImagesAndVideos
 from utils.comm_utils_lcs import Comm
-
 from utils.check_lcs import Check
-#from utils.check import draw_test_frame
-import os
+from conf.config import MAIN_SERVER_IP, MAIN_SERVER_UDP_PORT, LCS_CLS_DIR
 
-from conf.config import MAIN_SERVER_IP
-from conf.config import MAIN_SERVER_UDP_PORT, MAIN_SERVER_TCP_PORT
-from conf.config import AUG_V8_WEIGHTS_DIR_V1_2, TEST_VID_DIR
-from conf.config import LCS_CLS_DIR
 
-from collections import deque, Counter
+# =========================
+# Options
+# =========================
+ASPECT_MAX = 1.2                # width > height = 1.2
+MODEL_CONF = 0.6                # YOLO Confidence
+TRACK_CLASSES = [0, 1, 2]       # Classes that we use
+BUF_LEN = 5                     # Buffer Frame
+PATIENCE = 8                    # Send Trigger -> If there is no object in ~ frame after last detection, then send 
+EVENT_COOLDOWN_FRAMES = 150     # Don't Send after Sending LCS Information
+LANE_COOLDOWN_SECS = 10.0       # _1,_2 COOLDOWN
 
-#torch.serialization.add_safe_globals([
-    # torch native
-#    Sequential,
-#    ModuleList,
-#    Conv2d,
-#    BatchNorm2d,
-#    SiLU,
-#    Upsample,
-    
-    # ultralytics
-#    DetectionModel,
-#    Conv,
-#    C2f,
-#    C3,
-#    SPPF,
-#    Detect,
-#    Bottleneck,
-#])
-import uuid
+# Ignore ~~~ Frame after detect LCS
+IGNORE_WINDOW_FRAMES = 200
 
-#def gen_hash(s):
-#    hash_obj = hashlib.sha256()
-#    hash_obj.update(s.encode('utf-8'))
-#    return hash_obj.hexdigest()[:20] # duplicate is highly unlikely .... might be? 
+REQUIRE_TWO_FOR_SEND = True     # If you want to send LCS when _1,_2 both exists, set True
+DEBUG = True                    # If you want to debug, set True, If you don't want to debug, set False
 
-def gen_uuid(s):
+EXCLUDE_CLASS_NAMES = {"LCS_ROAD_BROKEN"}
+
+def gen_uuid(s: str) -> str:
     return str(uuid.uuid5(uuid.NAMESPACE_DNS, s))
+
+def xywh_to_xyxy(xywh, W, H):
+    cx, cy, w, h = map(float, xywh)
+    x1 = int(cx - w / 2); y1 = int(cy - h / 2)
+    x2 = int(cx + w / 2); y2 = int(cy + h / 2)
+    x1 = max(0, x1); y1 = max(0, y1)
+    x2 = min(W - 1, x2); y2 = min(H - 1, y2)
+    return x1, y1, x2, y2
+
 
 def main():
     model = YOLO("/data/YOLOv8_LCS/LCS_best.pt")
     model.fuse()
 
-    dataset = LoadImagesAndVideos("/data/YOLOv8_LCS/Send_Test_VMS_LCS.mp4", vid_stride=1)
+    #위에꺼(실시간), 밑에꺼(자체테스용, 동영상)
+    dataset = LCD_LoadStreams(sources="192.168.10.116", vid_stride=1, buffer=True)
+    # dataset = LoadImagesAndVideos("/data/YOLOv8_LCS/LCS_one_x_one_ok.avi", vid_stride=1)
 
     ch = Check()
-    first_keys = []
-    second_keys = []
-    sent_id = []
-    obs = {}
 
-    send_trigger = False
-    save_obs = deque([], maxlen=5)  # None 대신 빈 리스트
-    save_frames = deque([], maxlen=5)
+    # save_obs: [{'fnum': int, 'objs': [obj, ...]}, ...]
+    # obj = {'id','cx','cls_idx','cls_name','conf','xywh'}
+    save_obs = deque(maxlen=BUF_LEN)
+    save_frames = deque(maxlen=BUF_LEN)
+
     fnum = 0
     no_obs = 0
-    patience = 8
+    event_cooldown = 0
+    send_trigger = False
 
-    global send_once
+    lane_last_sent_ts = {'_1': 0.0, '_2': 0.0}
+
+    ignore_left = 0
+
+    global com
 
     for source, imgs, bs, count in dataset:
         np_img = np.array(imgs[0], dtype=np.uint8)
-        results = model.track(np_img, conf=0.3, classes=[0, 1, 2], verbose=False)
-
-        results[0].names = LCS_CLS_DIR
-        annotated_frame = results[0].plot()
+        H, W = np_img.shape[:2]
         fnum += 1
 
-        obs_list = {}
-        pframes = {}
-        id_list = []
+        if event_cooldown > 0:
+            event_cooldown -= 1
+        if ignore_left > 0:
+            ignore_left -= 1
+
+        results = model.track(
+            np_img,
+            persist=True,
+            tracker="bytetrack.yaml",
+            conf=MODEL_CONF,
+            classes=TRACK_CLASSES,
+            verbose=False
+        )
+        results[0].names = LCS_CLS_DIR
+
+        obs = []
+        total_cnt = 0
+        kept_broken = kept_aspect = kept_check = 0 
 
         for r in results:
-            results[0].names = LCS_CLS_DIR
-            cls_list = list(map(int, r.boxes.cls.tolist()))
-            conf_list = list(map(float, r.boxes.conf.tolist()))
+            r.names = LCS_CLS_DIR
+            ids = r.boxes.id
 
-            for idx, (cls, conf, xywh) in enumerate(zip(r.boxes.cls, r.boxes.conf, r.boxes.xywh)):
-                id = (f'{fnum}{idx}{int(cls)}')
+            for i, (cls, conf, xywh) in enumerate(zip(r.boxes.cls, r.boxes.conf, r.boxes.xywh)):
+                total_cnt += 1
+                cls = int(cls)
+                conf = float(conf)
+                xywh = xywh.tolist()
+                w, h = float(xywh[2]), float(xywh[3])
 
-                obs[id] = {
-                    'cls_name': r.names[int(cls)],
-                    'conf': float(conf),
-                    'xywh': xywh.tolist()
-                }
+                # Exception(BROKEN) #추후 BROKEN도 보려면 주석처리
+                cls_name = r.names[cls]
+                if (cls_name in EXCLUDE_CLASS_NAMES) or ("BROKEN" in cls_name.upper()):
+                    kept_broken += 1
+                    continue
 
-                x_center, y_center, width, height = map(int, xywh)
-                print(f"[FRAME {fnum}] ID:{id} | Class:{r.names[int(cls)]} | "
-                      f"Center:({x_center},{y_center}) | Width:{width}px | Height:{height}px | conf:{conf}")
+                # (1) 비율 필터
+                if w > h * ASPECT_MAX:
+                    kept_aspect += 1
+                    continue
 
-                if (ch.check_valid(cls, xywh, conf)) and (len(obs.keys()) >= 2):
-                    obs_list = dict(sorted(obs.items(), key=lambda item: item[1]['conf'], reverse=True))
-                    obs_list = dict(list(obs_list.items())[:2])
-                    obs_list = dict(sorted(obs_list.items(), key=lambda item: item[1]['xywh'][0]))
+                # (2) Check() ROI/크기/신뢰도 필터
+                if not ch.check_valid(cls, xywh, conf):
+                    kept_check += 1
+                    continue
 
-                    list(obs_list.items())[0][1]['cls_name'] += '_1'
-                    list(obs_list.items())[1][1]['cls_name'] += '_2'
+                # (3) 좌우 정렬용 center_x
+                cx = xywh[0]
 
-                    pframes[fnum] = obs_list
+                # (4) 트랙 아이디
+                trk_id = int(ids[i].item()) if ids is not None else None
+                obj_id = f"trk_{trk_id}" if trk_id is not None else f"f{fnum}_i{i}_c{cls}"
 
-        if len(pframes) != 0:
-            save_obs.append(pframes)
-            save_frames.append(annotated_frame)
+                obs.append({
+                    'id': obj_id,
+                    'cx': cx,
+                    'cls_idx': cls,
+                    'cls_name': cls_name,
+                    'conf': conf,
+                    'xywh': xywh
+                })
+
+        if DEBUG:
+            kept_cnt = len(obs)
+            print(f"[F{fnum}] total={total_cnt} / kept={kept_cnt} (broken:{kept_broken}, aspect:{kept_aspect}, check:{kept_check})")
+
+        if ignore_left > 0 or event_cooldown > 0:
+            if save_obs or save_frames:
+                save_obs.clear()
+                save_frames.clear()
+            continue
+
+        # 프레임 기준 2개 좌,우 정렬 후 LCS_ROAD_USABLE_1,_2 순으로 순서별로 정렬
+        frame_pack = {'fnum': fnum, 'objs': []}
+        if len(obs) > 0:
+            obs.sort(key=lambda o: o['conf'], reverse=True)
+            obs = obs[:2]  # 상위 2개
+            obs.sort(key=lambda o: o['cx'])  # 좌→우
+
+            if len(obs) == 1:
+                obs[0]['cls_name'] = f"{obs[0]['cls_name']}_1"
+            elif len(obs) == 2:
+                obs[0]['cls_name'] = f"{obs[0]['cls_name']}_1"
+                obs[1]['cls_name'] = f"{obs[1]['cls_name']}_2"
+
+            frame_pack['objs'] = obs
+
+        if len(frame_pack['objs']) > 0:
+            save_obs.append(frame_pack)
+            save_frames.append(np_img.copy())
 
         if (len(obs) == 0) and (len(save_obs) > 0):
             no_obs += 1
-            if no_obs > patience:
+            if no_obs > PATIENCE:
                 send_trigger = True
         else:
             no_obs = 0
 
-        for key in list(obs.keys()):
-            if key not in cls_list:
-                del obs[key]
+        if len(save_obs) == save_obs.maxlen:
+            send_trigger = True
 
         if send_trigger:
             send_trigger = False
+            event_cooldown = EVENT_COOLDOWN_FRAMES
+            ignore_left = IGNORE_WINDOW_FRAMES 
+            no_obs = 0 
 
-            for frame_dict in save_obs:
-                if frame_dict is None:
-                    continue
-                for ids in frame_dict.values():
-                    id_list.append(list(ids.keys()))
+            # 1) if LCS exists more than 2
+            send_idx = None
+            if REQUIRE_TWO_FOR_SEND:
+                for i in range(len(save_obs) - 1, -1, -1):
+                    if len(save_obs[i]['objs']) >= 2:
+                        send_idx = i
+                        break
 
-            if not id_list:
+            # case 2) if LCS exists less than 2, just send one
+            if send_idx is None:
+                for i in range(len(save_obs) - 1, -1, -1):
+                    if len(save_obs[i]['objs']) >= 1:
+                        send_idx = i
+                        break
+            if send_idx is None:
+                save_obs.clear()
+                save_frames.clear()
                 continue
 
-            first = [k[0] for k in id_list]
-            second = [k[1] for k in id_list]
+            send_pack = save_obs[send_idx]
+            base_frame = save_frames[send_idx]
 
-            first_keys = Counter(first)
-            second_keys = Counter(second)
+            if DEBUG:
+                print(f"[SEND] choose frame fnum={send_pack['fnum']} objs={len(send_pack['objs'])}")
 
-            most_common_first = first_keys.most_common(1)[0][0]
-            most_common_second = second_keys.most_common(1)[0][0]
+            now_ts = time.time()
+            actually_sent = 0
 
-            last_index = None
-            for index, kkk in enumerate(id_list):
-                if most_common_first in kkk and most_common_second in kkk:
-                    last_index = index
+            os.makedirs('data/test', exist_ok=True)
 
-            if last_index is not None:
-                frame_data = save_obs[last_index]
-                frame = save_frames[last_index]
-                for key, obj in frame_data.items():
-                    for id, data in obj.items():
-                        if id in sent_id:
-                            continue  
+            for data in send_pack['objs']:
+                cls_name = data.get('cls_name', 'unknown')
+                suffix = '_1' if cls_name.endswith('_1') else ('_2' if cls_name.endswith('_2') else None)
 
-                        detect_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")
-                        img_file_name = gen_uuid(detect_time) + '.jpg'
+                if suffix in lane_last_sent_ts:
+                    elapsed = now_ts - lane_last_sent_ts[suffix]
+                    if elapsed < LANE_COOLDOWN_SECS:
+                        if DEBUG:
+                            print(f"[COOLDOWN-SKIP] slot {suffix}: {elapsed:.1f}s < {LANE_COOLDOWN_SECS:.0f}s")
+                        continue
 
-                        msg = com.pack_data(int(id[-1]),
-                                            data.get('cls_name', 'unknown'),
-                                            data.get('conf', 0.0),
-                                            data.get('xywh', [0, 0, 0, 0]),
-                                            fnum,
-                                            detect_time,
-                                            img_file_name)
+                #Send
+                detect_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")
+                img_file_name = gen_uuid(detect_time) + '.jpg'
 
-                        com.send_data_to_udp(msg)
-                        com.upload_to_ftp(frame, data.get('cls_name', 'unknown'), img_file_name)
+                msg = com.pack_data(
+                    int(data.get('cls_idx', 0)),
+                    cls_name,
+                    float(data.get('conf', 0.0)),
+                    data.get('xywh', [0, 0, 0, 0]),
+                    send_pack['fnum'],
+                    detect_time,
+                    img_file_name
+                )
+                com.send_data_to_udp(msg)
 
-                        result_name = f"{str(fnum)}_{data.get('cls_name', 'unknown')}_{float(data.get('conf', 0.0))}"
-                        os.makedirs('results', exist_ok=True)
-                        open(f'data/test/{result_name}.txt', 'w').write(msg)
-                        cv2.imwrite(f'data/test/{result_name}.jpg', frame)
-                        print(msg)
+                sel_frame = base_frame.copy()
+                x1, y1, x2, y2 = xywh_to_xyxy(data['xywh'], base_frame.shape[1], base_frame.shape[0])
+                cv2.rectangle(sel_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-                        # 전송한 객체는 기록
-                        sent_id.append(id)
+                com.upload_to_ftp(sel_frame, cls_name, img_file_name)
+
+                safe_name = f"{cls_name}_{float(data.get('conf',0.0)):.2f}"
+                with open(f"data/test/{safe_name}.txt", "w") as fw:
+                    fw.write(msg)
+                cv2.imwrite(f"data/test/{safe_name}.jpg", sel_frame)
+
+                if DEBUG:
+                    print("udp send ", msg)
+
+                actually_sent += 1
+                if suffix in lane_last_sent_ts:
+                    lane_last_sent_ts[suffix] = now_ts
+
+            if DEBUG and actually_sent == 0:
+                print("[SEND] all candidates skipped by lane cooldown")
+
+            save_obs.clear()
+            save_frames.clear()
+
 
 if __name__ == "__main__":
-    send_once = True
     com = Comm(MAIN_SERVER_IP, MAIN_SERVER_UDP_PORT)
     main()
-
-
-
-#def main():
-#    model = YOLO('/jetson-inference/data/road_infra_yolov8/test_best3.pt')  # Load an official Detect model
-#    # model = YOLO('./models_v8/model_scratch.pt')  # Load an official Detect model
-#    model.fuse() # fusion conv2d and batchNorm2d 
-#
-#    dataset = LCD_LoadStreams(sources = "192.168.10.116", vid_stride = 1, buffer = True)
-#    #dataset = LoadImagesAndVideos("/jetson-inference/data/road_infra_yolov8/ts-test1.mp4", vid_stride = 1)
-#
-#    # obj_track_dict ex) {0: {'cls':0, 'cls_name':r.names[int(cls)],'conf':0.9, 'xywh':[10,20,30,40]}, 2: {'cls':0, 'cls_name':r.names[int(cls)],'conf':0.9, 'xywh':[133,203,303,430]} }
-#    obj_track_dict = {}
-#    sent_id = []
-#    ch = Check()
-#
-#    while True: # run
-#        for source, imgs, bs, count in dataset: # capture one frame \
-#            
-#            np_img = np.array(imgs[0], dtype=np.uint8)
-#            results = model.track(np_img, persist=True, tracker = "bytetrack.yaml")         # track  # https://docs.ultralytics.com/ko/reference/engine/model/#ultralytics.engine.model.Model_
-#            annotated_frame = results[0].plot()                                             # Visualize the result on the frame  -->  /home/keti/yolov8/ultralytics/ultralytics/engine/results.py               
-#            
-#            for r in results:    
-#                if r.boxes.id is not None:
-#                    id_list = list(map(int, r.boxes.id.tolist())) 
-#                    
-#                    # mapping { id : {cls : int, cls_name : str, conf : float , xywh : list} and appends dictionary
-#                    for idx, (id, cls, conf, xywh) in enumerate(zip(id_list, r.boxes.cls, r.boxes.conf, r.boxes.xywh)): # xywh : --> xy : bbox ceneter x,y wh : box wh ,,,,, if use r.boxes.xyxy : bbox x1,y1,x2,y2
-#                        obj_track_dict[id] = {
-#                            'cls_name': r.names[int(cls)],
-#                            'cls': int(cls),
-#                            'conf': float(conf),
-#                            'xywh': xywh.tolist()
-#                        }
-#                        if not ch.check_valid(cls, xywh, conf):
-#                            continue
-#
-#                        if not ch.check_count(id):
-#                            continue
-#
-#                        #send once  
-#                        if (send_once == True and id not in sent_id): #and check_valid()
-#
-#                            # gen detect time & img file name
-#                            detect_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")
-#                            img_file_name = gen_hash(detect_time) + '.jpg'
-#
-#                            # convert msg json type
-#                            msg = com.pack_data(obj_track_dict[id]['cls'], \
-#                                                obj_track_dict[id]['cls_name'], \
-#                                                obj_track_dict[id]['conf'], \
-#                                                obj_track_dict[id]['xywh'], \
-#                                                count, \
-#                                                detect_time, \
-#                                                img_file_name)
-#                            
-#                            # send msg to nuvo & upload img to nuvo ftp server 
-#                            com.send_data_to_udp(msg)
-#                            com.upload_to_ftp(annotated_frame, obj_track_dict[id]['cls_name'], img_file_name)
-#                            sent_id.append(id)
-#                        
-#                        # draw_test_frame(annotated_frame, xywh.tolist())
-#
-#                    # delete key. if id is not in frame.  
-#                    for key in list(obj_track_dict.keys()):
-#                        if key not in id_list:
-#                            del obj_track_dict[key]
-#
-#                            if key in sent_id:
-#                                sent_id.remove(key)
-#    
-#                    # print("obj_track_dict: ", obj_track_dict[id])
-#                                       
-#            #cv2.imshow("Tracking", annotated_frame)
-#            if cv2.waitKey(1) & 0xFF == ord("q"):
-#                break
-#            
-#if __name__ == "__main__":
-#    send_once = True
-#    com = Comm(MAIN_SERVER_IP, MAIN_SERVER_UDP_PORT)
-#    main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# if __name__ == "__main__":
-    
-#     model = YOLO('yolov8n.pt')  # Load an official Detect model
-#     model.fuse()
-
-#     byte_tracker = sv.ByteTrack()
-#     annotator = sv.BoxAnnotator()
-#     cap = Stream_Vision_Cam()  # store video capture object
-#     cap.setup(cam_ip='192.168.10.41', width=1280, height=720)
-#     while True:
-#         success, frame = cap.capture()
-#         results = model.track(frame, persist=True)
-#         # #Visualize the result on the frame
-#         annotated_frame = results.plot()
-
-#         cv2.imshow("Tracking", frame)
-#         if cv2.waitKey(1) & 0xFF == ord("q"):
-#             break
