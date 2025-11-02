@@ -40,7 +40,6 @@ class Stream_Vision_Cam:
 
     def create_devices_with_tries(self):
             print("search CAM")
-            time.sleep(20)
             tries = 0
             tries_max = 10
             sleep_time_secs = 10
