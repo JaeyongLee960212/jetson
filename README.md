@@ -6,9 +6,9 @@
 2. **LCS**  
    : Based on YOLOv8s, Trained by 17,394 images, Class : 3 (LCS_ROAD_USUABLE, LCS_ROAD_UNUSUABLE, LCS_BROKEN)
 3. **Traffic Light**  
-   : Based on YOLOv8s, Trained by 740,724 images, Class : 6 (TRAFFIC_LIGHT_GREEN etc...)
+   : Based on YOLOv8s, Trained by 740,724 images, Class : 6 (TRAFFICSIGNAL_GREEN etc...)
 4. **Traffic Sign**  
-   : Based on YOLOv8s, Trained by 489,429 images, Class : 82 (TRAFFIC_SIGN_YIELD etc...)
+   : Based on YOLOv8s, Trained by 489,429 images, Class : 82 (SAFETY_SIGN_YIELD etc...)
 
 ## Structure
 <pre>
@@ -67,7 +67,7 @@
  │   │   └── 📄 profiler.py (No update since 2023)
  ├── 📁 YOLOv8_TS(TS Folder)(Editing....)
  │   ├── 📄 TS_best.pt
- │   ├── 📄 run_track_v8_TS.py (Main Python File for VMS Model)
+ │   ├── 📄 run_track_v8_TS.py (Main Python File for TS Model)
  │   ├── 📄 run_v8_TS.sh (Executable File For Docker Compose)
  │   ├── 📁 Conf
  │   │   └── 📄 config.py (Config File such as Main Server IP, Cam Size, FTP Info, Class ID etc...)
@@ -88,7 +88,7 @@
  │   │   └── 📄 profiler.py (No update since 2023)
  ├── 📁 YOLOv8_TL(TL Folder)(Editing....)
  │   ├── 📄 TL_best.pt
- │   ├── 📄 run_track_v8_TL.py (Main Python File for VMS Model)
+ │   ├── 📄 run_track_v8_TL.py (Main Python File for TL Model)
  │   ├── 📄 run_v8_TL.sh (Executable File For Docker Compose)
  │   ├── 📁 Conf
  │   │   └── 📄 config.py (Config File such as Main Server IP, Cam Size, FTP Info, Class ID etc...)
