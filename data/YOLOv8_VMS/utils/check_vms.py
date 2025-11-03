@@ -2,13 +2,14 @@ import numpy as np
 from conf.config import LCD_CAMERA_IP, CAM_WIDTH, CAM_HEIGHT
 import cv2
 
+# ROI Check
 TOP_ROI_START_X = 0
 TOP_ROI_START_Y = 0
 TOP_ROI_END_X = int(CAM_WIDTH * 2/3)
 TOP_ROI_END_Y = int(CAM_HEIGHT * 1/3)
 
 
-#class Check(left_roi:list, right_roi:list, top_roi:list, box_size_th:int, conf_th:float): 
+# Check Threshold : Set the Threshold Value that fits with your vehicle
 class Check(): 
     def __init__(self):
         self.top_roi = [TOP_ROI_START_X, TOP_ROI_START_Y, TOP_ROI_END_X, TOP_ROI_END_Y]
@@ -51,32 +52,12 @@ class Check():
         box_size_ch = True if (self.box_width * self.box_height >= self.box_size_threshold) else False
 
         conf_ch = True if(confidence >= self.confidence_threshold) else False
-
-    #1. Traffic Sign Case
-    #2. Signal Case
         
         ch = ((top_roi_ch and conf_ch) and box_size_ch)
         #is_lr=="left"
 
         if ch: return True
         else: return False 
-
-
-    #Confidence Check 
-    # conf_check = True if confidence >= 0.7 else False
-
-    # if box_size >= 1000 and conf_check:
-    #     print(f"confidence : {confidence} box size : {box_size} Send Message")
-    #     return True
-    # else:
-    #     print(f"confidence : {confidence} box size : {box_size} Don't Send Message")
-    #     return False
-
-    # cv2.imshow("Tracking", annotated_frame)
-    #1280 * 720. 
-    # return True if (w*h > 400) else False
-    ...
-
 
     def draw_zone(img):
         img = cv2.rectangle(img,
@@ -85,15 +66,6 @@ class Check():
                         (255,0,20), # bgr
                         2)
         return img
-
-
-# 곡선을 정의하는 점들
-# points = np.array([[0, height], [width//2, -height], [width, height]])
-# t_values = np.linspace(0, 1, 100)
-# curve_points = np.array([((1-t)**2)*points[0] + (2*(1-t)*t)*points[1] + (t**2)*points[2] for t in t_values], np.int32)
-# 곡선 그리기
-# cv2.polylines(annotated_frame, [curve_points], isClosed=False, color=(255, 255, 255), thickness=2)
-'''
 
     def check_valid(self, cls, xywh, confidence):
         
@@ -136,27 +108,3 @@ class Check():
         box_size = w*h
 
         return False
-
-'''
-"""
-if __name__ == "__main__":
-    img_path = "/home/traffic/vms_ocr/frame_0100.jpg"
-    img = cv2.imread(img_path)
-    
-    right_roi = [RIGHT_ROI_START_X, RIGHT_ROI_START_Y, RIGHT_ROI_END_X, RIGHT_ROI_END_Y]
-    top_roi = [TOP_ROI_START_X, TOP_ROI_START_Y, TOP_ROI_END_X, TOP_ROI_END_Y]
-    
-    img = cv2.rectangle(img,
-                          (RIGHT_ROI_START_X, RIGHT_ROI_START_Y),
-                          (RIGHT_ROI_END_X, RIGHT_ROI_END_Y),
-                          (0,0,255), # bgr
-                          2)
-    
-    img = cv2.rectangle(img,
-                          (TOP_ROI_START_X, TOP_ROI_START_Y),
-                          (TOP_ROI_END_X, TOP_ROI_END_Y),
-                          (255,0,20), # bgr
-                          2)
-    
-    cv2.imshow(img)
-"""
