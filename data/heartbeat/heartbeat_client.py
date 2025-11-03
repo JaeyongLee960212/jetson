@@ -32,7 +32,7 @@ class UDP_Client:
             return None
 
     def send_heartbeat(self):
-        # label에 따라 sensorID 설정
+        # Sensor ID by label
         label_to_sensor = {
             "NUVO": "ET_INFRA_MARWIS_CPU",
             "ODYSSEY": "ET_INFRA_TUNNELLUX_CPU",
@@ -46,7 +46,7 @@ class UDP_Client:
         
         time_string = self.get_timestamp()
         try:
-            # ONSTART 전송
+            # ONSTART
             time_string = self.get_timestamp()
             message = {
                 "vehicle_id": config.Vehicle,
@@ -64,7 +64,7 @@ class UDP_Client:
             self.socket.sendto(json.dumps(message).encode(), self.server_addr)
             print(f"[{self.label}] HEARTBEAT: {message}")
 
-            # 주기적인 ON heartbeat 전송
+            # ON
             while True:
                 time_string = self.get_timestamp()
                 #message["year"] = year
@@ -80,7 +80,7 @@ class UDP_Client:
                 time.sleep(60)
 
         except KeyboardInterrupt:
-            # 사용자가 Ctrl+C로 종료한 경우
+            # Ctrl+c
             time_string = self.get_timestamp()
             #message["year"] = year
             #message["month"] = month
@@ -94,7 +94,7 @@ class UDP_Client:
             print(f"[{self.label}] HEARTBEAT: {message}")
 
         except:
-            # 예외 처리
+            # exception
             time_string = self.get_timestamp()
             message = {
                 "vehicle_id": config.Vehicle,
@@ -119,4 +119,5 @@ if __name__ == "__main__":
     print("Waiting for Server...")
     time.sleep(10)
     client.send_heartbeat()
+
 
