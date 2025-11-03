@@ -16,14 +16,14 @@ from conf.config import LIGHT_CLS_DIR
 import uuid
 
 # =========================
-# 디버그/저장 설정
+# Option
 # =========================
-DEBUG_SAVE          = True    # 디버그 저장 전체 on/off
-SAVE_PREVIEW        = False   # 프레임 전체 박스 프리뷰 저장(업로드에는 사용 X)
-SAVE_SELECTED       = True    # 선택 객체만 박스 그린 프레임 저장
-SAVE_CROP           = False   # 선택 객체 크롭 저장
-DRAW_ROI_ON_SAVE    = False   # ROI(관심영역)를 저장 이미지에도 그릴지
-SHOW_LABEL_ON_SAVE  = False   # 라벨(객체명/ID/Conf) 표시 여부(False면 박스만)
+DEBUG_SAVE          = True    # Debug Save (images will save)
+SAVE_PREVIEW        = False   # Check box to all classes which exists in one frame
+SAVE_SELECTED       = True    # Only detected objects are checked
+SAVE_CROP           = False   # Crop image save
+DRAW_ROI_ON_SAVE    = False   # Draw ROI line to your saved image
+SHOW_LABEL_ON_SAVE  = False   # Mark the label to your save image
 
 DEBUG_DIR           = "/data/debug_tl"
 PREVIEW_SUBDIR      = "preview"
@@ -66,13 +66,14 @@ def main():
     # model = YOLO(AUG_V8_WEIGHTS_DIR_V1_2 + '/weights/best.pt')
     model = YOLO("/data/YOLOv8_TL/best.pt")
     model.fuse()
-
+    
+    # Upper -> realtime, Lower -> video test
     dataset = LCD_LoadStreams(sources="192.168.10.116", vid_stride=1, buffer=True)
     # dataset = LoadImagesAndVideos("/data/Integration_test.mp4", vid_stride=1)
 
-    obj_track_dict = {}   # key: id_cls(int)  ex) 1002003  (id + zero-padded cls)
-    sent_id_cls = []      # send_once 시 중복 방지
-    sent_cls = []         # (옵션) 전송된 클래스 기록
+    obj_track_dict = {} 
+    sent_id_cls = []      
+    sent_cls = []         
     ch = Check()
     fnum = 0
 
@@ -87,7 +88,6 @@ def main():
 
         H, W = np_img.shape[:2]
 
-        # 트래킹 + 클래스 제한(예: [2,3,4,5])
         results = model.track(
             np_img,
             persist=True,
@@ -103,17 +103,14 @@ def main():
 
         results[0].names = LIGHT_CLS_DIR
 
-        # 프리뷰: 모든 박스(화면 확인/디버그 저장용)
         preview_frame = results[0].plot(labels=False, conf=False)
 
-        # 디버그: 프리뷰 저장
         if DEBUG_SAVE and SAVE_PREVIEW:
             cv2.imwrite(
                 os.path.join(DEBUG_DIR, PREVIEW_SUBDIR, f"{now_str()}_preview_f{fnum}.jpg"),
                 preview_frame
             )
 
-        # 업로드/그리기용 원본
         base_frame = np_img.copy()
 
         for r in results:
@@ -126,7 +123,6 @@ def main():
             cls_list = list(map(int, r.boxes.cls.tolist()))
             full_list = [f'{id}{cls:03d}' for id, cls in zip(id_list, cls_list)]
 
-            # 객체 루프
             for idx, (id_, cls, conf, xywh) in enumerate(zip(
                 id_list, r.boxes.cls, r.boxes.conf, r.boxes.xywh
             )):
@@ -134,7 +130,6 @@ def main():
                 conf = float(conf)
                 xywh = xywh.tolist()
 
-                # id_cls: 트랙 id + cls 세 자리
                 id_cls = int(f'{id_}{cls:03d}')
 
                 obj_track_dict[id_cls] = {
@@ -144,25 +139,20 @@ def main():
                     'xywh': xywh
                 }
 
-                # 사용자 정의 필터
                 if not ch.check_valid(cls, xywh, conf):
                     continue
                 if not ch.check_count(id_, str(id_cls)):
                     continue
 
-                # (예) 특정 클래스 제외
                 if obj_track_dict[id_cls]['cls'] == 2:
                     continue
 
-                # send_once: 한 번만 전송
                 if send_once and (id_cls in sent_id_cls):
                     continue
 
-                # 전송 메타
                 detect_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S:%f")
                 img_file_name = gen_uuid(detect_time) + '.jpg'
 
-                # 메시지 전송
                 msg = com.pack_data(
                     obj_track_dict[id_cls]['cls'],
                     obj_track_dict[id_cls]['cls_name'],
@@ -174,9 +164,6 @@ def main():
                 )
                 com.send_data_to_udp(msg)
 
-                # ================================
-                # ★★ FTP 업로드: 선택 객체 '한 개'만 박스 표시 ★★
-                # ================================
                 sel_frame = base_frame.copy()
 
                 if DRAW_ROI_ON_SAVE:
@@ -190,10 +177,8 @@ def main():
                     cv2.putText(sel_frame, label, (x1, max(0, y1 - 5)),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-                # 업로드(박스만 표시된 이미지)
                 com.upload_to_ftp(sel_frame, obj_track_dict[id_cls]['cls_name'], img_file_name)
 
-                # 디버그 저장(선택 프레임/크롭)
                 if DEBUG_SAVE and SAVE_SELECTED:
                     cv2.imwrite(
                         os.path.join(DEBUG_DIR, SELECTED_SUBDIR,
@@ -208,12 +193,10 @@ def main():
                         crop
                     )
 
-                # send_once 처리
                 if send_once:
                     sent_id_cls.append(id_cls)
                     sent_cls.append(cls)
 
-            # 프레임에서 사라진 트랙 정리
             for key in list(obj_track_dict.keys()):
                 key_str = str(key)
                 if key_str not in full_list:
@@ -223,7 +206,6 @@ def main():
 
         fnum += 1
 
-        # 화면 표시 디버그가 필요하다면 사용
         # cv2.imshow("TL Tracking Preview", preview_frame)
         # if cv2.waitKey(1) & 0xFF == ord("q"):
         #     break
