@@ -6,7 +6,7 @@ from datetime import datetime
 from utils.loader import LCD_LoadStreams, LoadImagesAndVideos
 from utils.comm_utils import Comm
 from utils.check_ts import Check
-# from utils.check import draw_test_frame  # 필요 시 사용
+# from utils.check import draw_test_frame 
 
 from conf.config import MAIN_SERVER_IP
 from conf.config import MAIN_SERVER_UDP_PORT
@@ -15,23 +15,22 @@ from conf.config import SIGN_CLS_DIR, U1_CLASS_MAPPING_DIR
 import uuid
 
 # =========================
-# 디버그/저장 설정
+# Option
 # =========================
-DEBUG_SAVE        = True   # 디버그 저장 전체 on/off
-SAVE_PREVIEW      = False   # 프레임 전체 박스 프리뷰 저장 (업로드에는 사용 X)
-SAVE_SELECTED     = True   # 선택 객체만 박스 그린 프레임 저장
-SAVE_CROP         = False  # 선택 객체 크롭 이미지 저장
-DRAW_ROI_ON_SAVE  = False  # ROI 박스도 저장할지 여부
-SHOW_LABEL_ON_SAVE = False # 박스 위에 객체 이름 표시 여부(False면 박스만 표시)
+DEBUG_SAVE          = True    # Debug Save (images will save)
+SAVE_PREVIEW        = False   # Check box to all classes which exists in one frame
+SAVE_SELECTED       = True    # Only detected objects are checked
+SAVE_CROP           = False   # Crop image save
+DRAW_ROI_ON_SAVE    = False   # Draw ROI line to your saved image
+SHOW_LABEL_ON_SAVE  = False   # Mark the label to your save image
 
-DEBUG_DIR         = "/data/debug"  # 디버그 저장 경로
+DEBUG_DIR         = "/data/debug"  
 PREVIEW_SUBDIR    = "preview"
 SELECTED_SUBDIR   = "selected"
 CROP_SUBDIR       = "crop"
 
 
 def ensure_dirs():
-    """디버그 저장용 디렉토리 생성"""
     if not DEBUG_SAVE:
         return
     os.makedirs(DEBUG_DIR, exist_ok=True)
@@ -44,7 +43,6 @@ def ensure_dirs():
 
 
 def gen_uuid(s: str) -> str:
-    """문자열 s로부터 UUIDv5 생성 (DNS namespace)"""
     return str(uuid.uuid5(uuid.NAMESPACE_DNS, s))
 
 
@@ -169,7 +167,6 @@ def main():
                     cv2.putText(sel_frame, label, (x1, max(0, y1 - 5)),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-                # FTP 업로드 (박스만 표시된 이미지)
                 com.upload_to_ftp(sel_frame, cls_name, img_file_name)
 
                 if DEBUG_SAVE and SAVE_SELECTED:
@@ -198,12 +195,6 @@ def main():
                         sent_id.remove(key)
 
         fnum += 1
-
-        # (옵션) 실시간 화면 보기용
-        # cv2.imshow("Tracking", preview_frame)
-        # if cv2.waitKey(1) & 0xFF == ord("q"):
-        #     break
-
 
 if __name__ == "__main__":
     send_once = True
