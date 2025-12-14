@@ -35,8 +35,8 @@
  │   │   ├── 📄 py_ipconfig_manual.py
  │   │   └── 📄 py_live_stream.py
  │   ├── 📁 trackers
- │   │   ├── 📄 botsort.yaml (We use this Tracking Method for now)
- │   │   ├── 📄 bytetrack.yaml
+ │   │   ├── 📄 botsort.yaml 
+ │   │   ├── 📄 bytetrack.yaml (We use this Tracking Method for now)
  │   │   └── 📄 bytetrack-bak.yaml  
  │   └── 📁 utils
  │   │   ├── 📄 check_vms.py (Settings for Check ROI Options, Threshold and Size Parameters)
@@ -56,8 +56,8 @@
  │   │   ├── 📄 py_ipconfig_manual.py
  │   │   └── 📄 py_live_stream.py
  │   ├── 📁 trackers
- │   │   ├── 📄 botsort.yaml (We use this Tracking Method for now)
- │   │   ├── 📄 bytetrack.yaml
+ │   │   ├── 📄 botsort.yaml 
+ │   │   ├── 📄 bytetrack.yaml (We use this Tracking Method for now)
  │   │   └── 📄 bytetrack-bak.yaml  
  │   └── 📁 utils
  │   │   ├── 📄 check_lcs.py (Settings for Check ROI Options, Threshold and Size Parameters)
@@ -77,8 +77,8 @@
  │   │   ├── 📄 py_ipconfig_manual.py
  │   │   └── 📄 py_live_stream.py
  │   ├── 📁 trackers
- │   │   ├── 📄 botsort.yaml (We use this Tracking Method for now)
- │   │   ├── 📄 bytetrack.yaml
+ │   │   ├── 📄 botsort.yaml 
+ │   │   ├── 📄 bytetrack.yaml (We use this Tracking Method for now)
  │   │   └── 📄 bytetrack-bak.yaml  
  │   └── 📁 utils
  │   │   ├── 📄 check_ts.py (Settings for Check ROI Options, Threshold and Size Parameters)
@@ -98,8 +98,8 @@
  │   │   ├── 📄 py_ipconfig_manual.py
  │   │   └── 📄 py_live_stream.py
  │   ├── 📁 trackers
- │   │   ├── 📄 botsort.yaml (We use this Tracking Method for now)
- │   │   ├── 📄 bytetrack.yaml
+ │   │   ├── 📄 botsort.yaml 
+ │   │   ├── 📄 bytetrack.yaml (We use this Tracking Method for now)
  │   │   └── 📄 bytetrack-bak.yaml  
  │   └── 📁 utils
  │   │   ├── 📄 check_tl.py (Settings for Check ROI Options, Threshold and Size Parameters)
